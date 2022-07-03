@@ -1,10 +1,28 @@
+#added tests
+from crypt import methods
 import os
 from flask import Flask, render_template, request
 from flask_googlemaps import GoogleMaps, Map
 from dotenv import load_dotenv
+from peewee import *
+from datetime import datetime
+from playhouse.shortcuts import model_to_dict
 
+app = Flask(__name__)
+if os.getenv('TESTING') == 'true':
+    print('testing app')
+    mydb = SqliteDatabase('file:memory?mode=memory&cache=shared',uri=True)
+else:
+    mydb = MySQLDatabase(os.getenv("MYSQL_DATABASE"), 
+        user=os.getenv("MYSQL_USER"), 
+        password = os.getenv("MYSQL_PASSWORD"),
+        host = os.getenv("MYSQL_HOST"),
+        port = 3306 )
 load_dotenv()
-app = Flask(__name__, )
+
+
+
+
 GoogleMaps(app, key=os.getenv("MAPS_API_KEY"))
 
 
@@ -128,3 +146,52 @@ def hobbies_and_map():
                            trdmap=bobomap,
                            hobbies=hobbies,
                            url=os.getenv("URL"))
+
+@app.route('/timeline')
+def timeline():
+    return render_template('timeline.html',title="timeline")
+
+
+
+
+class TimelinePost(Model):
+    name = CharField()
+    email = CharField()
+    content = TextField()
+    created_at = DateTimeField(default=datetime.now)
+    
+    class Meta:
+        database = mydb
+mydb.connect()
+mydb.create_tables([TimelinePost])
+
+@app.route('/api/timeline_post', methods=['POST'])
+def post_time_line_post():
+    try:
+        name = request.form['name']
+    except KeyError:
+        return "Invalid Name", 400
+    try:
+        email = request.form['email']
+        if not '@' in email:
+            return "Invalid Email", 400
+    except KeyError:
+        return "Invalid Email", 400
+    try:
+        content = request.form['content']
+        if len(content)<2:
+            return "Invalid Content", 400
+    except KeyError:
+        return "Invalid Content", 400
+    timeline_post= TimelinePost.create(name=name, email=email, content=content)
+
+    return model_to_dict(timeline_post) 
+
+@app.route('/api/timeline_post', methods=['GET'])
+def get_time_line_post():
+    return {
+        'timeline_posts':[
+            model_to_dict(p)
+            for p in TimelinePost.select().order_by(TimelinePost.created_at.desc())            
+        ]
+    }    
