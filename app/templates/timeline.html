@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TimeLine Page</title>
+
+    <style>
+      table {
+        font-family: arial, sans-serif;
+        border-collapse: collapse;
+        width: 100%;
+      }
+
+      td,
+      th {
+        border: 1px solid #dddddd;
+        text-align: left;
+        padding: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <form>
+      <label for="date" class="label">Date:</label><br />
+      <input type="text" id="date" name="date" /><br />
+      <label for="title">Title:</label><br />
+      <input type="text" id="title" name="title" /><br /><br />
+      <label for="title">Events:</label><br />
+      <input type="text" id="events" name="events" /><br /><br />
+      <input type="submit" value="Submit" />
+    </form>
+    <table>
+      <caption>
+        <strong> Responses </strong>
+      </caption>
+      <tbody id="ALL_POSTS">
+        <tr>
+          <th>Date</th>
+          <th>Title</th>
+          <th>Event</th>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+
+  <script>
+    form = document.querySelector("form");
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const FD = new FormData(e.target);
+      fetch("/api/timeline_post", {
+        method: "POST",
+        body: FD,
+      });
+
+      fetch("/api/timeline_post").then((resp) => {
+        resp.json().then((d) => {
+          const list = document.querySelector("#ALL_POSTS");
+          const posts = d.posts;
+
+          while (list.childNodes.length > 2) {
+            console.log(list.lastChild);
+            list.removeChild(list.lastChild);
+          }
+
+          posts.forEach((e) => {
+            let tr = document.createElement("tr");
+            let tdDate = document.createElement("td");
+            let tdTitle = document.createElement("td");
+            let tdEvents = document.createElement("td");
+            tdDate.textContent = e.date;
+            tdTitle.textContent = e.title;
+            tdEvents.textContent = e.events;
+            tr.append(tdDate);
+            tr.append(tdTitle);
+            tr.append(tdEvents);
+            list.appendChild(tr);
+          });
+        });
+      });
+    });
+  </script>
+</html>

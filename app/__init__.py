@@ -1,130 +1,70 @@
-import os
-from flask import Flask, render_template, request
-from flask_googlemaps import GoogleMaps, Map
+from flask import Flask, jsonify, redirect, render_template, request
 from dotenv import load_dotenv
+from peewee import MySQLDatabase, Model, CharField, TextField, SqliteDatabase
+from playhouse.shortcuts import model_to_dict
+import os
 
 load_dotenv()
-app = Flask(__name__, )
-GoogleMaps(app, key=os.getenv("MAPS_API_KEY"))
+app = Flask(__name__)
+
+if os.getenv("TESTING") == "true":
+    print("Running in test mode")
+    db = SqliteDatabase('file:memory?mode=memory&cache=shared', uri=True)
+else:
+    db = MySQLDatabase(os.getenv("MYSQL_DATABASE"),
+                       user=os.getenv("MYSQL_USER"),
+                       password=os.getenv("MYSQL_PASSWORD"),
+                       host=os.getenv("MYSQL_HOST"),
+                       port=3306)
+
+
+class TimelinePost(Model):
+    date = CharField()
+    title = CharField()
+    events = TextField()
+
+    class Meta:
+        database = db
+
+
+db.create_tables([TimelinePost], safe=True)
+
+
+@app.route("/api/timeline_post", methods=["GET", "POST", "DELETE"])
+def timeline_post():
+    if request.method == "POST":
+        if 'date' not in request.form:
+            return jsonify({"error": "Invalid date"}), 400
+        if 'title' not in request.form:
+            return jsonify({"error": "Invalid title"}), 400
+        if 'events' not in request.form or request.form['events'] == '':
+            return jsonify({"error": "Invalid events"}), 400
+
+        date = request.form["date"]
+        title = request.form["title"]
+        events = request.form["events"]
+
+        timeline_post = TimelinePost.create(date=date,
+                                            title=title,
+                                            events=events)
+        timeline_post.save()
+        return model_to_dict(timeline_post)
+    elif request.method == "GET":
+        return {'posts': [model_to_dict(p) for p in TimelinePost.select()]}
+    elif request.method == "DELETE":
+        del_id = request.form["id"]
+        TimelinePost.delete_by_id(del_id)
+        return f'Removed ID: {del_id}'
+
+
+@app.route("/flask/timeline")
+def timeline():
+    return render_template("timeline.html")
 
 
 @app.route("/")
 def index():
-
-    # **Shape of Data**
-    #
-    # experiences = [{
-    #    "name": string,
-    #    "role": string,
-    #    "date": string
-    # }, ...]
-    #
-    # hobbies = [{
-    #    "name": string,
-    #    "img": string
-    # }, ...]
-    #
-    # education = [{
-    #    "name": string,
-    #    "location": string
-    # }, ...]
-
-    return render_template("main.jinja",
-                           title="Bobo the Baboon",
-                           name="Bobo",
-                           hobbies="Working out and Gaming",
-                           url=os.getenv("URL"),
-                           experiences=[
-                               {
-                                   "name": "Meta",
-                                   "role": "Production Engineer",
-                                   "date": "XX 2021 - XX 2022"
-                               },
-                               {
-                                   "name": "Google",
-                                   "role": "Software Engineer",
-                                   "date": "XX 2020 - XX 2021"
-                               },
-                               {
-                                   "name": "Amazon",
-                                   "role": "Systems Development Engineer",
-                                   "date": "XX 2019 - XX 2020"
-                               },
-                           ],
-                           educations=[{
-                               "name": "Yale University",
-                               "location": "New Haven, CT"
-                           }, {
-                               "name": "Harvard University",
-                               "location": "Cambridge, MA"
-                           }, {
-                               "name": "Stanford University",
-                               "location": "Stanford, CA"
-                           }])
-
-
-@app.route("/hobbies")
-def hobbies_and_map():
-    # creating a map in the view
-    title = "Bobo's Hobbies"
-
-    bobomap = Map(
-        identifier="bobomap",
-        lat=9.1304,
-        lng=41.2809,
-        markers=[{
-            'icon':
-            'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-            'lat':
-            9.1304,
-            'lng':
-            41.2809,
-            'infobox':
-            '<img src="https://cdn3.iconfinder.com/data/icons/142-mini-country-flags-16x16px/32/flag-denmark2x.png" width=32px height=32px/>',
-        }, {
-            'icon':
-            'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
-            'lat':
-            23.6345,
-            'lng':
-            -102.5528,
-            'infobox':
-            '<img src="https://cdn3.iconfinder.com/data/icons/142-mini-country-flags-16x16px/32/flag-mexico2x.png" width=32px height=32px/>'
-        }, {
-            'icon':
-            'http://maps.google.com/mapfiles/ms/icons/green-dot.png',
-            'lat':
-            15.8700,
-            'lng':
-            100.9925,
-            'infobox':
-            '<img src= "../static/img/bobo.jpg" width=32px height=32px/>'
-        }, {
-            'icon':
-            'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
-            'lat':
-            64.9631,
-            'lng':
-            -19.0208,
-            'infobox':
-            '<img src= "https://cdn3.iconfinder.com/data/icons/142-mini-country-flags-16x16px/32/flag-iceland2x.png" width=32px height=32px/>'
-        }],
-        style="height:600px;width:1200px;margin:auto",
-        zoom=2)
-
-    hobbies = [
-        {
-            "name": "Gaming",
-            "img": "./img/game.jpg"
-        },
-        {
-            "name": "Working Out",
-            "img": "./img/gym.jpg"
-        },
-    ]
-
-    return render_template('hobbies_and_map.jinja',
-                           title=title,
-                           trdmap=bobomap,
-                           hobbies=hobbies,
-                           url=os.getenv("URL"))
+    return redirect(request.environ.get('HTTP_ORIGIN',
+                                        'http://localhost:5000').replace(
+                                            ":5000", ":3000"),
+                    code=301)

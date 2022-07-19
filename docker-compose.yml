@@ -1,0 +1,35 @@
+version: "3"
+services:
+  react:
+    container_name: react
+    build: ./client
+    ports:
+      - 3000:80
+    restart: always
+
+  myportfolio:
+    container_name: myportfolio
+    build: .
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - FLASK_ENV=development
+    ports:
+      - 5000:5000
+    volumes:
+      - .:/myportfolio
+    depends_on:
+      - mysql
+
+  mysql:
+    container_name: mysql
+    image: mariadb
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - mydatabase:/var/lib/mysql
+
+volumes:
+  mydatabase:
